@@ -1,0 +1,55 @@
+name: erp_painel
+description: Software para gerenciamento de pedidos da Central de Distribuição - Ao Gosto Carnes - Unidade Barreiro
+
+publish_to: 'none'
+
+version: 1.4.3+143
+
+environment:
+  sdk: ^3.6.1
+
+dependencies:
+  google_fonts: ^6.2.1
+  flutter:
+    sdk: flutter
+  http: ^1.1.0
+  intl: ^0.19.0
+  path_provider: ^2.0.15
+  open_file: ^3.2.1
+  flutter_launcher_icons: ^0.13.1
+  cupertino_icons: ^1.0.8
+  fl_chart: ^0.68.0
+  permission_handler: ^10.2.0
+  printing: ^5.14.2
+  pdf: ^3.11.1
+  shared_preferences: ^2.5.2
+  url_launcher: ^6.3.0
+  crypto: ^3.0.3
+  path: ^1.9.0
+  package_info_plus: ^8.0.0
+
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/icon2.png
+    - assets/icon/GO-logo.png
+
+flutter_launcher_icons:
+  android:
+    generate: true
+  ios:
+    generate: true
+  macos:
+    generate: true
+  windows:
+    generate: true
+  image_path: "assets/icon/GO-logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/icon2.png"
