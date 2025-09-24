@@ -1,0 +1,14 @@
+{
+    "latest": "1.0.0",
+    "notes": "Primeira versão publicada pelo GitHub Actions",
+    "changelog": {
+      "1.0.0": "Lançamento inicial"
+    },
+    "assets": [
+      {
+        "platform": "windows",
+        "url": "https://github.com/trajanoo93/sistema-erp-barreiro/releases/download/v1.0.0/app_windows_v1.0.0.zip"
+      }
+    ]
+  }
+  
