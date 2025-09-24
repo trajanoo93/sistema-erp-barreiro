@@ -2,7 +2,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
@@ -111,13 +110,14 @@ class _SemVer implements Comparable<_SemVer> {
 /// ====== SERVICE ======
 
 class UpdatesService {
-  /// Coloque a URL real do seu manifesto (JSON) aqui.
-  static const String defaultManifestUrl = 'https://ao-gosto-app-c0b31.web.app/updates/manifest.json';
+  /// URL fixa do manifest hospedado no GitHub (raw.githubusercontent).
+  static const String defaultManifestUrl =
+      'https://raw.githubusercontent.com/trajanoo93/sistema-erp-barreiro/main/updates/manifest.json';
 
   final String manifestUrl;
   const UpdatesService({this.manifestUrl = defaultManifestUrl});
 
-  /// --------- VERSÃO INSTANCE (para a sua primeira página) ----------
+  /// --------- VERSÃO INSTANCE ----------
   Future<UpdateManifest> fetchManifest({String? url}) =>
       UpdatesService._fetchManifest(url ?? manifestUrl);
 
@@ -138,7 +138,7 @@ class UpdatesService {
         onProgress: onProgress,
       );
 
-  /// --------- VERSÃO STATIC (para a sua segunda página) ----------
+  /// --------- VERSÃO STATIC ----------
   static Future<UpdateCheckResult> checkForUpdates({String? url}) async {
     final manifest = await _fetchManifest(url ?? defaultManifestUrl);
     final current = await _getCurrentVersion();
@@ -166,26 +166,18 @@ class UpdatesService {
       throw 'Suportado apenas no Windows.';
     }
 
-    // 1) Baixa ZIP para a pasta de backups/<versão> (ou temp)
     final zipFile = await _downloadUpdateZip(
       asset,
       fileName: 'update_$latestVersion.zip',
       onProgress: onProgressPercent,
     );
 
-    // 2) Verifica SHA-256 (se fornecida)
     if ((asset.sha256 ?? '').trim().isNotEmpty) {
       final ok = await _verifySha256(zipFile, asset.sha256!.toLowerCase());
-      if (!ok) {
-        throw 'SHA-256 não confere para ${zipFile.path}';
-      }
+      if (!ok) throw 'SHA-256 não confere para ${zipFile.path}';
     }
 
-    // 3) Gera .bat que:
-    //    - cria backup
-    //    - extrai zip por cima do app
-    //    - relança o app
-    final exe = Platform.resolvedExecutable; // seu app .exe
+    final exe = Platform.resolvedExecutable;
     final appDir = p.dirname(exe);
     final backupsDir = await _getBackupsDir();
     final stamp = DateTime.now()
@@ -222,10 +214,8 @@ exit
 
   static Future<void> runUpdaterAndExit(String batPath) async {
     if (!Platform.isWindows) throw 'Apenas Windows.';
-    // Abre o .bat em outra janela e encerra o app atual
     await Process.start('cmd', ['/C', 'start', '', batPath],
         mode: ProcessStartMode.detached);
-    // Dá um tempinho para soltar handles antes de sair.
     await Future.delayed(const Duration(milliseconds: 300));
     exit(0);
   }
@@ -277,9 +267,7 @@ exit
   static UpdateAsset? _pickAssetFor(String platform, UpdateManifest m) {
     final pLower = platform.toLowerCase();
     try {
-      return m.assets.firstWhere(
-        (a) => a.platform.toLowerCase() == pLower,
-      );
+      return m.assets.firstWhere((a) => a.platform.toLowerCase() == pLower);
     } catch (_) {
       return null;
     }
@@ -290,7 +278,8 @@ exit
     String? fileName,
     void Function(double progress)? onProgress,
   }) async {
-    final resp = await http.Client().send(http.Request('GET', Uri.parse(asset.url)));
+    final resp =
+        await http.Client().send(http.Request('GET', Uri.parse(asset.url)));
     if (resp.statusCode != 200) {
       throw 'Falha ao baixar: HTTP ${resp.statusCode}';
     }
