@@ -1,0 +1,31 @@
+name: Build and Release (Windows)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # Exemplo: v1.2.3
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.7'  # ajuste para a versão que você usa
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Create ZIP package
+        run: |
+          powershell Compress-Archive -Path build/windows/runner/Release/* -DestinationPath app_windows_${{ github.ref_name }}.zip
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: app_windows_${{ github.ref_name }}.zip
