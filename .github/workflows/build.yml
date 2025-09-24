@@ -3,7 +3,7 @@ name: Build and Release (Windows)
 on:
   push:
     tags:
-      - 'v*.*.*'   # Exemplo: v1.2.3
+      - 'v*.*.*'
 
 jobs:
   build-windows:
@@ -16,17 +16,18 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.32.7'  # ajuste para a versão que você usa
+          flutter-version: '3.32.7'
 
       - name: Install dependencies for Windows build
         run: |
-          choco install visualstudio2022buildtools visualstudio2022-workload-vctools cmake ninja -y
+          choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional --passive --norestart" -y
+          choco install cmake ninja -y
 
       - name: Build Windows release
         run: flutter build windows --release
 
       - name: List build output (debug)
-        run: dir build/windows/runner
+        run: dir build/windows
 
       - name: Create ZIP package
         run: |
