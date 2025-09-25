@@ -22,7 +22,6 @@ class PedidoState with ChangeNotifier {
   // Estado do pedido
   List<Map<String, dynamic>> products = [];
   String shippingMethod = '';
-  String selectedVendedor = 'Alline';
   double shippingCost = 0.0;
   String storeFinal = '';
   String pickupStoreId = '';
@@ -43,7 +42,7 @@ class PedidoState with ChangeNotifier {
   String? storeIndication;
   bool isFetchingStore = false;
   String? lastPhoneNumber;
-  String lastCep = ''; // Adicionado para rastrear o último CEP verificado
+  String lastCep = '';
   List<Map<String, String>> availablePaymentMethods = [];
   Map<String, String> paymentAccounts = {'stripe': 'stripe', 'pagarme': 'central'};
   final VoidCallback? onCouponValidated;
@@ -61,7 +60,6 @@ class PedidoState with ChangeNotifier {
   }
 
   void reset() {
-    // Libera os controladores atuais
     phoneController.dispose();
     nameController.dispose();
     emailController.dispose();
@@ -75,8 +73,6 @@ class PedidoState with ChangeNotifier {
     couponController.removeListener(_onCouponChanged);
     couponController.dispose();
     shippingCostController.dispose();
-
-    // Inicializa novos controladores
     _initializeControllers();
     shippingCostController.text = shippingCost.toStringAsFixed(2);
     couponController.addListener(_onCouponChanged);
@@ -84,7 +80,7 @@ class PedidoState with ChangeNotifier {
     availablePaymentMethods = [];
     paymentAccounts = {'stripe': 'stripe', 'pagarme': 'central'};
     schedulingDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    lastCep = ''; // Resetar lastCep
+    lastCep = '';
     notifyListeners();
   }
 
@@ -104,7 +100,6 @@ class PedidoState with ChangeNotifier {
   }
 
   void resetControllers() {
-    // Libera os controladores atuais
     phoneController.dispose();
     nameController.dispose();
     emailController.dispose();
@@ -118,15 +113,13 @@ class PedidoState with ChangeNotifier {
     couponController.removeListener(_onCouponChanged);
     couponController.dispose();
     shippingCostController.dispose();
-
-    // Inicializa novos controladores
     _initializeControllers();
     shippingCostController.text = shippingCost.toStringAsFixed(2);
     couponController.addListener(_onCouponChanged);
     selectedPaymentMethod = '';
     availablePaymentMethods = [];
     paymentAccounts = {'stripe': 'stripe', 'pagarme': 'central'};
-    lastCep = ''; // Resetar lastCep
+    lastCep = '';
     notifyListeners();
   }
 
@@ -233,7 +226,6 @@ class PedidoState with ChangeNotifier {
       'coupon': couponController.text,
       'products': products,
       'shippingMethod': shippingMethod,
-      'selectedVendedor': selectedVendedor,
       'shippingCost': shippingCost,
       'shippingCostController': shippingCostController.text,
       'storeFinal': storeFinal,
@@ -254,7 +246,7 @@ class PedidoState with ChangeNotifier {
       'storeIndication': storeIndication,
       'isFetchingStore': isFetchingStore,
       'lastPhoneNumber': lastPhoneNumber,
-      'lastCep': lastCep, // Adicionado para persistência
+      'lastCep': lastCep,
       'availablePaymentMethods': availablePaymentMethods,
       'paymentAccounts': paymentAccounts,
     };
@@ -275,7 +267,6 @@ class PedidoState with ChangeNotifier {
     pedido.couponController.text = json['coupon'] ?? '';
     pedido.products = List<Map<String, dynamic>>.from(json['products'] ?? []);
     pedido.shippingMethod = json['shippingMethod'] ?? '';
-    pedido.selectedVendedor = json['selectedVendedor'] ?? 'Alline';
     pedido.shippingCost = (json['shippingCost'] ?? 0.0).toDouble();
     pedido.shippingCostController.text = json['shippingCostController'] ?? '0.00';
     pedido.storeFinal = json['storeFinal'] ?? '';
@@ -296,7 +287,7 @@ class PedidoState with ChangeNotifier {
     pedido.storeIndication = json['storeIndication'] ?? '';
     pedido.isFetchingStore = json['isFetchingStore'] ?? false;
     pedido.lastPhoneNumber = json['lastPhoneNumber'];
-    pedido.lastCep = json['lastCep'] ?? ''; // Adicionado para persistência
+    pedido.lastCep = json['lastCep'] ?? '';
     pedido.availablePaymentMethods = List<Map<String, String>>.from(json['availablePaymentMethods'] ?? []);
     pedido.paymentAccounts = Map<String, String>.from(json['paymentAccounts'] ?? {'stripe': 'stripe', 'pagarme': 'central'});
     return pedido;

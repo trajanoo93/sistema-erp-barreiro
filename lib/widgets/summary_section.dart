@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:erp_painel/models/pedido_state.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
 
 class SummarySection extends StatelessWidget {
   final double totalOriginal;
@@ -35,94 +33,12 @@ class SummarySection extends StatelessWidget {
   }) : super(key: key);
 
   Future<void> logToFile(String message) async {
-    // desativado
-  }
-
-  Future<void> _sendPaymentMessage(BuildContext context) async {
-    String? phoneNumber =
-        pedido.lastPhoneNumber ?? pedido.phoneController.text.replaceAll(RegExp(r'\D'), '');
-    if (phoneNumber.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, insira o número de telefone do cliente.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      await logToFile('Erro: phoneNumber is empty in _sendPaymentMessage');
-      return;
-    }
-
-    phoneNumber = '+55$phoneNumber';
-    if (paymentInstructions == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nenhuma instrução de pagamento disponível.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      await logToFile('Erro: paymentInstructions is null in _sendPaymentMessage');
-      return;
-    }
-
-    String formattedMessage;
     try {
-      final paymentData = jsonDecode(paymentInstructions!);
-      formattedMessage = paymentData['type'] == 'pix'
-          ? paymentData['text'] ?? ''
-          : paymentData['url'] ?? '';
-      await logToFile(
-          'Parsed paymentInstructions: $paymentData, formattedMessage: $formattedMessage');
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/sistema-erp-barreiro/app_logs.txt');
+      await file.writeAsString('[${DateTime.now()}] $message\n', mode: FileMode.append);
     } catch (e) {
-      formattedMessage = paymentInstructions!;
-      await logToFile(
-          'Erro ao parsear paymentInstructions: $e, usando fallback: $formattedMessage');
-    }
-
-    final url = Uri.parse('https://api.wzap.chat/v1/messages');
-    final payload = {
-      "phone": phoneNumber,
-      "message": formattedMessage.trim(),
-    };
-    final headers = {
-      "Token":
-          "7343607cd11509da88407ea89353ebdd8a79bdf9c3152da4025274c08c370b7b90ab0b68307d28cf",
-      "Content-Type": "application/json",
-    };
-
-    try {
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: jsonEncode(payload),
-      );
-      await logToFile(
-          'Resposta da API WhatsApp: status=${response.statusCode}, body=${response.body}');
-      if (response.statusCode == 200 ||
-          response.statusCode == 201 ||
-          (response.statusCode == 400 &&
-              jsonDecode(response.body)['status'] == 'queued')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mensagem enviada com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao enviar mensagem: ${response.body}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    } catch (e) {
-      await logToFile('Erro na conexão com WhatsApp API: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro na conexão: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      debugPrint('Falha ao escrever log: $e');
     }
   }
 
@@ -157,16 +73,13 @@ class SummarySection extends StatelessWidget {
     if (paymentInstructions != null) {
       try {
         final paymentData = jsonDecode(paymentInstructions!);
-        paymentText =
-            paymentData['type'] == 'pix' ? paymentData['text'] : paymentData['url'];
+        paymentText = paymentData['type'] == 'pix' ? paymentData['text'] : paymentData['url'];
         isPix = paymentData['type'] == 'pix';
-        logToFile(
-            'Payment instructions parsed: type=${paymentData['type']}, text=${paymentData['text']}, url=${paymentData['url']}');
+        logToFile('Payment instructions parsed: type=${paymentData['type']}, text=${paymentData['text']}, url=${paymentData['url']}');
       } catch (e) {
         paymentText = paymentInstructions;
         isPix = !paymentInstructions!.contains('checkout.stripe.com');
-        logToFile(
-            'Erro ao parsear paymentInstructions: $e, usando fallback: $paymentText, isPix: $isPix');
+        logToFile('Erro ao parsear paymentInstructions: $e, usando fallback: $paymentText, isPix: $isPix');
       }
     } else {
       logToFile('paymentInstructions is null in SummarySection');
@@ -207,11 +120,8 @@ class SummarySection extends StatelessWidget {
             primaryColor: primaryColor,
             icon: Icons.location_on,
             label: 'Loja Selecionada',
-            value: pedido.storeFinal.isNotEmpty
-                ? '📍 ${pedido.storeFinal}'
-                : 'Aguardando cálculo',
-            valueStyle: GoogleFonts.poppins(
-                fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+            value: pedido.storeFinal.isNotEmpty ? '📍 ${pedido.storeFinal}' : 'Aguardando cálculo',
+            valueStyle: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
           ),
           const SizedBox(height: 8),
           _buildSummaryRow(
@@ -234,8 +144,7 @@ class SummarySection extends StatelessWidget {
               icon: Icons.discount,
               label: 'Desconto ($couponCode)',
               value: '- R\$ ${discountAmount.toStringAsFixed(2)}',
-              valueStyle: GoogleFonts.poppins(
-                  fontSize: 16, color: successColor, fontWeight: FontWeight.w600),
+              valueStyle: GoogleFonts.poppins(fontSize: 16, color: successColor, fontWeight: FontWeight.w600),
             ),
           ],
           const SizedBox(height: 8),
@@ -244,14 +153,12 @@ class SummarySection extends StatelessWidget {
             primaryColor: primaryColor,
             label: 'Total com Desconto',
             value: 'R\$ ${totalWithDiscount.toStringAsFixed(2)}',
-            valueStyle: GoogleFonts.poppins(
-                fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black87),
+            valueStyle: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black87),
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             value: pedido.availablePaymentMethods.isNotEmpty &&
-                    pedido.availablePaymentMethods
-                        .any((m) => m['title'] == pedido.selectedPaymentMethod)
+                    pedido.availablePaymentMethods.any((m) => m['title'] == pedido.selectedPaymentMethod)
                 ? pedido.selectedPaymentMethod
                 : null,
             decoration: InputDecoration(
@@ -275,8 +182,7 @@ class SummarySection extends StatelessWidget {
               prefixIcon: Icon(Icons.payment, color: primaryColor),
               filled: true,
               fillColor: Colors.white,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
             style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87),
             items: pedido.availablePaymentMethods.map((method) {
@@ -284,8 +190,7 @@ class SummarySection extends StatelessWidget {
                 value: method['title'],
                 child: Text(
                   method['title'] ?? '',
-                  style:
-                      GoogleFonts.poppins(fontSize: 14, color: Colors.black87),
+                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87),
                 ),
               );
             }).toList(),
@@ -296,8 +201,7 @@ class SummarySection extends StatelessWidget {
                 logToFile('Método de pagamento selecionado: $value');
               }
             },
-            validator: (value) =>
-                value == null ? 'Selecione um método de pagamento' : null,
+            validator: (value) => value == null ? 'Selecione um método de pagamento' : null,
             hint: Text(
               pedido.schedulingDate.isEmpty || pedido.schedulingTime.isEmpty
                   ? 'Selecione data e horário primeiro'
@@ -317,8 +221,7 @@ class SummarySection extends StatelessWidget {
                         SnackBar(
                           content: Text(
                             'Criando pedido...',
-                            style: GoogleFonts.poppins(
-                                fontSize: 14, color: Colors.white),
+                            style: GoogleFonts.poppins(fontSize: 14, color: Colors.white),
                           ),
                           backgroundColor: primaryColor,
                           duration: const Duration(seconds: 2),
@@ -329,8 +232,7 @@ class SummarySection extends StatelessWidget {
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 2,
                 shadowColor: Colors.black.withOpacity(0.2),
               ),
@@ -338,13 +240,11 @@ class SummarySection extends StatelessWidget {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     )
                   : Text(
                       'Criar Pedido',
-                      style: GoogleFonts.poppins(
-                          fontSize: 18, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
                     ),
             ),
           ),
@@ -356,14 +256,9 @@ class SummarySection extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: resultMessage!.contains('Erro')
-                      ? Colors.red.shade50
-                      : Colors.green.shade50,
+                  color: resultMessage!.contains('Erro') ? Colors.red.shade50 : Colors.green.shade50,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: resultMessage!.contains('Erro')
-                          ? Colors.red.shade200
-                          : Colors.green.shade200),
+                  border: Border.all(color: resultMessage!.contains('Erro') ? Colors.red.shade200 : Colors.green.shade200),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.1),
@@ -375,12 +270,8 @@ class SummarySection extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      resultMessage!.contains('Erro')
-                          ? Icons.error
-                          : Icons.check_circle,
-                      color: resultMessage!.contains('Erro')
-                          ? Colors.redAccent
-                          : successColor,
+                      resultMessage!.contains('Erro') ? Icons.error : Icons.check_circle,
+                      color: resultMessage!.contains('Erro') ? Colors.redAccent : successColor,
                       size: 24,
                     ),
                     const SizedBox(width: 12),
@@ -390,9 +281,7 @@ class SummarySection extends StatelessWidget {
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: resultMessage!.contains('Erro')
-                              ? Colors.redAccent
-                              : Colors.green.shade800,
+                          color: resultMessage!.contains('Erro') ? Colors.redAccent : Colors.green.shade800,
                         ),
                       ),
                     ),
@@ -401,9 +290,7 @@ class SummarySection extends StatelessWidget {
               ),
             ),
           ],
-          if (paymentInstructions != null &&
-              paymentText != null &&
-              paymentText.isNotEmpty) ...[
+          if (paymentInstructions != null && paymentText != null && paymentText.isNotEmpty) ...[
             const SizedBox(height: 16),
             AnimatedOpacity(
               opacity: paymentText!.isNotEmpty ? 1.0 : 0.0,
@@ -434,9 +321,7 @@ class SummarySection extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          isPix
-                              ? 'Pagamento via Pix'
-                              : 'Pagamento via Cartão de Crédito',
+                          isPix ? 'Pagamento via Pix' : 'Pagamento via Cartão de Crédito',
                           style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -460,7 +345,7 @@ class SummarySection extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            paymentText!,
+                            paymentText,
                             style: GoogleFonts.poppins(
                               fontSize: 14,
                               color: Colors.black87,
@@ -473,35 +358,9 @@ class SummarySection extends StatelessWidget {
                         IconButton(
                           icon: Icon(Icons.copy, size: 20, color: primaryColor),
                           onPressed: () => _copyToClipboard(context, paymentText),
-                          tooltip: isPix
-                              ? 'Copiar Código Pix'
-                              : 'Copiar Link de Pagamento',
+                          tooltip: isPix ? 'Copiar Código Pix' : 'Copiar Link de Pagamento',
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _sendPaymentMessage(context),
-                        icon: const Icon(Icons.message,
-                            size: 20, color: Colors.white),
-                        label: Text(
-                          'Enviar via WhatsApp',
-                          style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: successColor,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          elevation: 2,
-                          shadowColor: Colors.black.withOpacity(0.2),
-                        ),
-                      ),
                     ),
                   ],
                 ),

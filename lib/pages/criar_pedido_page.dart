@@ -13,6 +13,8 @@ import 'package:erp_painel/widgets/address_section.dart';
 import 'package:erp_painel/widgets/scheduling_section.dart';
 import 'package:erp_painel/widgets/summary_section.dart';
 import 'package:erp_painel/widgets/product_selection_dialog.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 // Normaliza data para YYYY-MM-DD
 String normalizeYmd(String dateStr) {
@@ -59,7 +61,7 @@ class CriarPedidoPage extends StatefulWidget {
 
 class _CriarPedidoPageState extends State<CriarPedidoPage> {
   final primaryColor = const Color(0xFFF28C38);
-  final _formKey = GlobalKey<FormState>(); // ✅ chave persistente
+  final _formKey = GlobalKey<FormState>();
   late PedidoState _pedido;
   bool _isLoading = false;
   String? _resultMessage;
@@ -79,31 +81,6 @@ class _CriarPedidoPageState extends State<CriarPedidoPage> {
     super.initState();
     _initializePedido();
   }
-
-  Future<void> _clearLocalData() async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.clear();
-  setState(() {
-    _pedido.resetControllers();
-    _pedido.products.clear();
-    _pedido.shippingMethod = 'delivery';
-    _pedido.selectedPaymentMethod = '';
-    _pedido.storeFinal = '';
-    _pedido.pickupStoreId = '';
-    _pedido.shippingCost = 0.0;
-    _pedido.shippingCostController.text = '0.00';
-    _pedido.showNotesField = false;
-    _pedido.showCouponField = false;
-    _pedido.schedulingDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    _pedido.schedulingTime = '09:00 - 12:00';
-    _pedido.isCouponValid = false;
-    _pedido.discountAmount = 0.0;
-    _pedido.couponErrorMessage = null;
-    _pedido.availablePaymentMethods = [];
-    _pedido.paymentAccounts = {'stripe': 'stripe', 'pagarme': 'central'};
-  });
-}
-
 
   Future<void> _initializePedido() async {
     _pedido = PedidoState(onCouponValidated: _onCouponValidated);
@@ -166,7 +143,13 @@ class _CriarPedidoPageState extends State<CriarPedidoPage> {
   }
 
   Future<void> logToFile(String message) async {
-    // logs desativados
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/sistema-erp-barreiro/app_logs.txt');
+      await file.writeAsString('[${DateTime.now()}] $message\n', mode: FileMode.append);
+    } catch (e) {
+      debugPrint('Falha ao escrever log: $e');
+    }
   }
 
   Future<void> _loadPersistedData() async {
@@ -200,6 +183,7 @@ class _CriarPedidoPageState extends State<CriarPedidoPage> {
     _pedido.isAddressSectionExpanded = prefs.getBool('isAddressSectionExpanded') ?? true;
     _pedido.isProductsSectionExpanded = prefs.getBool('isProductsSectionExpanded') ?? true;
     _pedido.isShippingSectionExpanded = prefs.getBool('isShippingSectionExpanded') ?? true;
+    await logToFile('Dados persistidos carregados: shippingMethod=${_pedido.shippingMethod}, storeFinal=${_pedido.storeFinal}, pickupStoreId=${_pedido.pickupStoreId}, shippingCost=${_pedido.shippingCost}');
   }
 
   Future<void> _savePersistedData() async {
@@ -554,118 +538,144 @@ class _CriarPedidoPageState extends State<CriarPedidoPage> {
   }
 
   Future<Map<String, String>?> _generatePaymentLink({
-  required String customerName,
-  required String phoneNumber,
-  required double amount,
-  required String storeUnit,
-  required String paymentMethod,
-  required String orderId,
-}) async {
-  final rawPhone = phoneNumber.replaceAll(RegExp(r'\D'), '').trim();
-  final areaCode = rawPhone.length >= 2 ? rawPhone.substring(0, 2) : '31';
-  final phone = rawPhone.length >= 9 ? rawPhone.substring(2) : rawPhone;
-  if (amount < 0.50) {
-    throw Exception('O valor total do pedido deve ser maior ou igual a R\$ 0,50.');
-  }
-  final amountInCents = (amount * 100).toInt();
-  final proxyUnit = Uri.encodeComponent(storeUnit); // Codifica 'Unidade Barreiro' como 'Unidade%20Barreiro'
-  final endpoint = 'https://aogosto.com.br/proxy/$proxyUnit/${paymentMethod == 'Pix' ? 'pagarme.php' : 'stripe.php'}';
-  await logToFile('Gerando link de pagamento: paymentMethod=$paymentMethod, storeUnit=$storeUnit, proxyUnit=$proxyUnit, endpoint=$endpoint, amountInCents=$amountInCents');
-  try {
-    if (paymentMethod == 'Pix') {
-      final payloadPagarMe = {
-        'items': [
-          {'amount': amountInCents, 'description': 'Produtos Ao Gosto Carnes', 'quantity': 1},
-        ],
-        'customer': {
-          'name': customerName,
-          'email': 'app+${DateTime.now().millisecondsSinceEpoch}@aogosto.com.br',
-          'document': '06275992000570',
-          'type': 'company',
-          'phones': {
-            'home_phone': {'country_code': '55', 'number': phone, 'area_code': areaCode}
-          },
-        },
-        'payments': [
-          {
-            'payment_method': 'pix',
-            'pix': {'expires_in': 3600}
-          }
-        ],
-        'metadata': {'order_id': orderId, 'unidade': storeUnit},
-      };
-      await logToFile('Payload PagarMe: ${jsonEncode(payloadPagarMe)}');
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payloadPagarMe),
-      );
-      await logToFile('Resposta do proxy PagarMe: status=${response.statusCode}, body=${response.body}');
-      if (response.statusCode != 200) {
-        throw Exception('Erro ao criar pedido PIX: status ${response.statusCode} - ${response.body}');
-      }
-      if (response.body.startsWith('<!DOCTYPE') || response.body.contains('<html')) {
-        throw Exception('Resposta inválida do servidor (HTML em vez de JSON): ${response.body}');
-      }
-      final data = jsonDecode(response.body);
-      if (data['charges'] != null && data['charges'].isNotEmpty && data['charges'][0]['last_transaction'] != null) {
-        final pixInfo = data['charges'][0]['last_transaction'];
-        final pixText = pixInfo['text']?.toString() ?? '';
-        if (pixText.isEmpty) {
-          await logToFile('Aviso: pixText vazio, usando qr_code como fallback: ${pixInfo['qr_code'] ?? 'null'}');
-          final fallbackText = pixInfo['qr_code']?.toString() ?? '';
-          if (fallbackText.isEmpty) {
-            throw Exception('Nenhuma linha digitável ou QR code retornado para Pix.');
-          }
-          return {'type': 'pix', 'text': fallbackText};
-        }
-        await logToFile('Pix text extraído: $pixText');
-        return {'type': 'pix', 'text': pixText};
-      } else {
-        throw Exception('Nenhuma transação PIX retornada ou estrutura de resposta inválida: ${jsonEncode(data)}');
-      }
-    } else {
-      final payloadStripe = {
-        'product_name': customerName,
-        'product_description': 'Produtos Ao Gosto Carnes',
-        'amount': amountInCents,
-        'phone_number': '($areaCode) $phone',
-        'metadata': {'order_id': orderId, 'unidade': storeUnit},
-      };
-      await logToFile('Payload Stripe: ${jsonEncode(payloadStripe)}');
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payloadStripe),
-      );
-      await logToFile('Resposta do proxy Stripe: status=${response.statusCode}, body=${response.body}');
-      if (response.statusCode != 200) {
-        throw Exception('Erro ao criar link Stripe: status ${response.statusCode} - ${response.body}');
-      }
-      if (response.body.startsWith('<!DOCTYPE') || response.body.contains('<html')) {
-        throw Exception('Resposta inválida do servidor (HTML em vez de JSON): ${response.body}');
-      }
-      final data = jsonDecode(response.body);
-      if (data['payment_link'] != null && data['payment_link']['url'] != null) {
-        await logToFile('Stripe URL gerada: ${data['payment_link']['url']}');
-        return {'type': 'stripe', 'url': data['payment_link']['url']};
-      } else {
-        throw Exception('Nenhuma URL de checkout retornada: ${jsonEncode(data)}');
-      }
+    required String customerName,
+    required String phoneNumber,
+    required double amount,
+    required String storeUnit,
+    required String paymentMethod,
+    required String orderId,
+  }) async {
+    final rawPhone = phoneNumber.replaceAll(RegExp(r'\D'), '').trim();
+    final areaCode = rawPhone.length >= 2 ? rawPhone.substring(0, 2) : '31';
+    final phone = rawPhone.length >= 9 ? rawPhone.substring(2) : rawPhone;
+    if (amount < 0.50) {
+      throw Exception('O valor total do pedido deve ser maior ou igual a R\$ 0,50.');
     }
-  } catch (error) {
-    await logToFile('Erro ao gerar link de pagamento: $error');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Erro ao gerar link de pagamento: $error'),
-        backgroundColor: Colors.redAccent,
-      ),
-    );
-    return null; // Fallback para continuar criando o pedido sem link
+    final amountInCents = (amount * 100).toInt();
+    final proxyUnit = Uri.encodeComponent(storeUnit); // Codifica 'Unidade Barreiro' como 'Unidade%20Barreiro'
+    final endpoint = 'https://aogosto.com.br/proxy/$proxyUnit/${paymentMethod == 'Pix' ? 'pagarme.php' : 'stripe.php'}';
+    await logToFile('Gerando link de pagamento: paymentMethod=$paymentMethod, storeUnit=$storeUnit, proxyUnit=$proxyUnit, endpoint=$endpoint, amountInCents=$amountInCents');
+    try {
+      if (paymentMethod == 'Pix') {
+        final payloadPagarMe = {
+          'items': [
+            {'amount': amountInCents, 'description': 'Produtos Ao Gosto Carnes', 'quantity': 1},
+          ],
+          'customer': {
+            'name': customerName,
+            'email': 'app+${DateTime.now().millisecondsSinceEpoch}@aogosto.com.br',
+            'document': '06275992000570',
+            'type': 'company',
+            'phones': {
+              'home_phone': {'country_code': '55', 'number': phone, 'area_code': areaCode}
+            },
+          },
+          'payments': [
+            {
+              'payment_method': 'pix',
+              'pix': {'expires_in': 3600}
+            }
+          ],
+          'metadata': {'order_id': orderId, 'unidade': storeUnit},
+        };
+        await logToFile('Payload PagarMe: ${jsonEncode(payloadPagarMe)}');
+        final response = await http.post(
+          Uri.parse(endpoint),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(payloadPagarMe),
+        );
+        await logToFile('Resposta do proxy PagarMe: status=${response.statusCode}, body=${response.body}');
+        if (response.statusCode != 200) {
+          throw Exception('Erro ao criar pedido PIX: status ${response.statusCode} - ${response.body}');
+        }
+        if (response.body.startsWith('<!DOCTYPE') || response.body.contains('<html')) {
+          throw Exception('Resposta inválida do servidor (HTML em vez de JSON): ${response.body}');
+        }
+        final data = jsonDecode(response.body);
+        if (data['charges'] != null && data['charges'].isNotEmpty && data['charges'][0]['last_transaction'] != null) {
+          final pixInfo = data['charges'][0]['last_transaction'];
+          final pixText = pixInfo['text']?.toString() ?? '';
+          if (pixText.isEmpty) {
+            await logToFile('Aviso: pixText vazio, usando qr_code como fallback: ${pixInfo['qr_code'] ?? 'null'}');
+            final fallbackText = pixInfo['qr_code']?.toString() ?? '';
+            if (fallbackText.isEmpty) {
+              throw Exception('Nenhuma linha digitável ou QR code retornado para Pix.');
+            }
+            return {'type': 'pix', 'text': fallbackText};
+          }
+          await logToFile('Pix text extraído: $pixText');
+          return {'type': 'pix', 'text': pixText};
+        } else {
+          throw Exception('Nenhuma transação PIX retornada ou estrutura de resposta inválida: ${jsonEncode(data)}');
+        }
+      } else {
+        final payloadStripe = {
+          'product_name': customerName,
+          'product_description': 'Produtos Ao Gosto Carnes',
+          'amount': amountInCents,
+          'phone_number': '($areaCode) $phone',
+          'metadata': {'order_id': orderId, 'unidade': storeUnit},
+        };
+        await logToFile('Payload Stripe: ${jsonEncode(payloadStripe)}');
+        final response = await http.post(
+          Uri.parse(endpoint),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(payloadStripe),
+        );
+        await logToFile('Resposta do proxy Stripe: status=${response.statusCode}, body=${response.body}');
+        if (response.statusCode != 200) {
+          throw Exception('Erro ao criar link Stripe: status ${response.statusCode} - ${response.body}');
+        }
+        if (response.body.startsWith('<!DOCTYPE') || response.body.contains('<html')) {
+          throw Exception('Resposta inválida do servidor (HTML em vez de JSON): ${response.body}');
+        }
+        final data = jsonDecode(response.body);
+        if (data['payment_link'] != null && data['payment_link']['url'] != null) {
+          await logToFile('Stripe URL gerada: ${data['payment_link']['url']}');
+          return {'type': 'stripe', 'url': data['payment_link']['url']};
+        } else {
+          throw Exception('Nenhuma URL de checkout retornada: ${jsonEncode(data)}');
+        }
+      }
+    } catch (error) {
+      await logToFile('Erro ao gerar link de pagamento: $error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao gerar link de pagamento: $error'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return null; // Fallback para continuar criando o pedido sem link
+    }
   }
-}
 
-    void _onCouponValidated() {
+  Future<void> _clearLocalData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    setState(() {
+      _pedido.resetControllers();
+      _pedido.products.clear();
+      _pedido.shippingMethod = 'delivery';
+      _pedido.selectedPaymentMethod = '';
+      _pedido.storeFinal = '';
+      _pedido.pickupStoreId = '';
+      _pedido.shippingCost = 0.0;
+      _pedido.shippingCostController.text = '0.00';
+      _pedido.showNotesField = false;
+      _pedido.showCouponField = false;
+      _pedido.schedulingDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      _pedido.schedulingTime = '09:00 - 12:00';
+      _pedido.isCouponValid = false;
+      _pedido.discountAmount = 0.0;
+      _pedido.couponErrorMessage = null;
+      _pedido.availablePaymentMethods = [];
+      _pedido.paymentAccounts = {'stripe': 'stripe', 'pagarme': 'central'};
+      _resultMessage = 'Dados locais limpos com sucesso';
+    });
+    await logToFile('Dados locais limpos pelo usuário');
+  }
+
+  void _onCouponValidated() {
     if (mounted) setState(() {});
   }
 
@@ -692,11 +702,11 @@ class _CriarPedidoPageState extends State<CriarPedidoPage> {
     final totalOriginal = _pedido.calculateTotal(applyDiscount: false);
     final totalWithDiscount = _pedido.calculateTotal(applyDiscount: true);
     return Scaffold(
-      appBar: null, // 👈 sem título
+      appBar: null,
       body: Column(
         children: [
           if (_isLoading)
-            LinearProgressIndicator( // 👈 barra de carregamento mantida
+            LinearProgressIndicator(
               backgroundColor: primaryColor.withOpacity(0.2),
               valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
             ),
@@ -705,7 +715,7 @@ class _CriarPedidoPageState extends State<CriarPedidoPage> {
                 ? SingleChildScrollView(
                     padding: const EdgeInsets.all(16.0),
                     child: Form(
-                      key: _formKey, // ✅ persistente
+                      key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -731,11 +741,6 @@ class _CriarPedidoPageState extends State<CriarPedidoPage> {
                               onNameChanged: (value) => _savePersistedData(),
                               emailController: _pedido.emailController,
                               onEmailChanged: (value) => _savePersistedData(),
-                              selectedVendedor: _pedido.selectedVendedor,
-                              onVendedorChanged: (value) {
-                                setState(() => _pedido.selectedVendedor = value ?? 'Alline');
-                                _savePersistedData();
-                              },
                               validator: (value) => null,
                               isLoading: _isLoading,
                             ),
@@ -767,7 +772,6 @@ class _CriarPedidoPageState extends State<CriarPedidoPage> {
                                   ),
                                 ),
                                 body: AddressSection(
-                 
                                   cepController: _pedido.cepController,
                                   addressController: _pedido.addressController,
                                   numberController: _pedido.numberController,
