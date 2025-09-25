@@ -6,8 +6,11 @@ import 'package:path_provider/path_provider.dart';
 
 import 'pages/dashboard_page.dart';
 import 'pages/pedidos_page.dart';
+import 'pages/criar_pedido_page.dart';
+import 'pages/criar_link_page.dart';
+import 'pages/conferir_pagamentos_page.dart';
 import 'pages/motoboys_page.dart';
-import 'pages/atualizacoes_page.dart'; // <-- novo import
+import 'pages/atualizacoes_page.dart';
 import 'widgets/sidebar_menu.dart';
 import 'enums.dart';
 
@@ -35,8 +38,6 @@ Future<bool> _acquireSingleInstanceLock() async {
       return false;
     }
   } catch (e) {
-    // Se algo der errado ao tentar travar, não bloqueia a execução do app
-    // (melhor deixar rodar do que falhar no start)
     debugPrint('Falha ao criar lock de instância: $e');
     return true;
   }
@@ -46,15 +47,12 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   FlutterError.onError = (details) {
-    // Log de erros em tempo de execução
     print('Erro capturado: ${details.exception}, stack: ${details.stack}');
   };
 
-  // Garante instância única no Windows (evita impressões duplicadas em caso de app aberto 2x)
   if (Platform.isWindows) {
     final ok = await _acquireSingleInstanceLock();
     if (!ok) {
-      // Já existe outra instância; encerra silenciosamente
       exit(0);
     }
   }
@@ -67,11 +65,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('Iniciando aplicativo com locale pt_BR'); // Log de depuração
+    print('Iniciando aplicativo com locale pt_BR');
     return MaterialApp(
       title: 'Meu Painel ERP - Barreiro',
       debugShowCheckedModeBanner: false,
-      locale: const Locale('pt', 'BR'), // Força LTR
+      locale: const Locale('pt', 'BR'),
       theme: ThemeData(
         primarySwatch: Colors.orange,
         textTheme: GoogleFonts.poppinsTextTheme(),
@@ -104,10 +102,16 @@ class _HomePageState extends State<HomePage> {
         return const DashboardPage();
       case MenuItem.pedidos:
         return const PedidosPage();
+      case MenuItem.novoPedido:
+        return const CriarPedidoPage();
+      case MenuItem.criarLink:
+        return const CriarLinkPage();
+      case MenuItem.verPagamentos:
+        return const ConferirPagamentosPage();
       case MenuItem.motoboys:
         return const MotoboysPage();
       case MenuItem.atualizacoes:
-        return const AtualizacoesPage(); // <-- nova aba
+        return const AtualizacoesPage();
       default:
         return const DashboardPage();
     }

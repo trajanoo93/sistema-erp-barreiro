@@ -55,8 +55,12 @@ class PedidoDetailDialog extends StatelessWidget {
   String formatDate(String? date) {
     if (date == null || date.trim().isEmpty) return 'N/A';
     try {
-      final dt = DateTime.parse(date);
-      return DateFormat('dd/MM').format(dt);
+      final dt = DateTime.tryParse(date)?.toLocal();
+      if (dt != null) {
+        return DateFormat('dd/MM').format(dt);
+      } else {
+        return date;
+      }
     } catch (_) {
       return date;
     }
@@ -65,8 +69,12 @@ class PedidoDetailDialog extends StatelessWidget {
   String formatAgendamentoDate(String? date) {
     if (date == null || date.trim().isEmpty) return '';
     try {
-      final dt = DateTime.parse(date);
-      return DateFormat('dd/MM').format(dt);
+      final dt = DateTime.tryParse(date)?.toLocal();
+      if (dt != null) {
+        return DateFormat('dd/MM').format(dt);
+      } else {
+        return date;
+      }
     } catch (_) {
       return date;
     }
