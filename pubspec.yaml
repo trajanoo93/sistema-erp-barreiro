@@ -9,11 +9,14 @@ environment:
   sdk: ^3.6.1
 
 dependencies:
-  google_fonts: ^6.2.1
   flutter:
     sdk: flutter
+  flutter_localizations: # 👈 necessário para DatePicker, traduções etc
+    sdk: flutter
+
+  google_fonts: ^6.2.1
   http: ^1.1.0
-  intl: ^0.19.0
+  intl: ^0.20.2 # 👈 atualizado para bater com o Flutter SDK
   path_provider: ^2.0.15
   open_file: ^3.2.1
   flutter_launcher_icons: ^0.13.1
@@ -27,8 +30,7 @@ dependencies:
   crypto: ^3.0.3
   path: ^1.9.0
   package_info_plus: ^8.0.0
-
-
+  mask_text_input_formatter: ^2.9.0
 
 dev_dependencies:
   flutter_test:
