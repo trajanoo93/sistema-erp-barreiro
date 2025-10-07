@@ -140,7 +140,7 @@ class CustomerSection extends StatelessWidget {
         TextFormField(
           controller: emailController,
           decoration: InputDecoration(
-            labelText: 'E-mail',
+            labelText: 'E-mail (Opcional)',
             labelStyle: GoogleFonts.poppins(
               color: Colors.grey.shade600,
               fontWeight: FontWeight.w500,
